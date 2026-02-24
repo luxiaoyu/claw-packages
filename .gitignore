@@ -46,3 +46,5 @@ scripts/apt-packages-list-*.txt
 
 # Generated on GitHub Actions CI when building kernel modules
 /scripts/*.ko.zst
+
+AGENTS.md
