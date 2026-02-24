@@ -94,7 +94,6 @@ jobs:
 
       - name: Build bootstrap from source
         run: |
-          set -o pipefail
           echo "=== Building from SOURCE (not pre-built packages) ==="
           echo "This compiles all packages from scratch so com.moonshot.kimiclaw prefix takes effect"
           echo "Timeout: 8 hours"
