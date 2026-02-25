@@ -234,14 +234,17 @@ jobs:
           Optimized with binary stripping and non-essential file removal.
 
           ### Included packages:
-          - **nodejs-lts** - Node.js LTS runtime + npm
+          - **nodejs-lts** - Node.js LTS runtime
+          - **npm** - npm package manager
           - **git** - Git version control
           - **openssh** - SSH client and server
           - **openssl** - OpenSSL tools
           - **termux-api** - Termux:API interface
-          - **proot** - proot for /tmp support
+          - **proot** - proot for /tmp support via termux-chroot
           - **expect** - expect for automated password setup
-          - **android-tools** - adb/fastboot for wireless ADB fallback
+          - **python** - Python runtime
+          - **uv** - Ultra-fast Python package manager (Rust-based)
+          - **command-not-found** - Suggest installation of packages in interactive shell sessions
 
           ### Package prefix: `com.moonshot.kimiclaw`
           NOTES
