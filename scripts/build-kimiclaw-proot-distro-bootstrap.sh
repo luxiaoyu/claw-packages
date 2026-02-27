@@ -18,6 +18,7 @@ SCRIPT_DIR="$(dirname "$(realpath "$0")")"
 # KimiClaw additional packages to include in the bootstrap.
 KIMICLAW_PACKAGES=(
     "openssl"          # OpenSSL tools
+    "openssh"          # SSH client and server
     "proot"            # proot for /tmp support via termux-chroot
     "proot-distro"     # proot-distro for managing multiple distros
 )
