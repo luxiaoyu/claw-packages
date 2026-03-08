@@ -105,8 +105,6 @@ jobs:
           # - Mount output cache for built debs
           docker run --rm \
             --init \
-            --cap-add CAP_SYS_ADMIN \
-            --device /dev/fuse \
             -v "$PWD:/home/builder/termux-packages" \
             -v "$PWD/build-cache/.termux-build:/home/builder/.termux-build" \
             -v "$PWD/build-cache/output:/home/builder/termux-packages/output" \
