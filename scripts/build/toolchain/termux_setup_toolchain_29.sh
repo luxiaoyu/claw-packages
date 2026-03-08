@@ -134,11 +134,21 @@ termux_setup_toolchain_29() {
 
 
 	if ! mountpoint -q "${TERMUX_STANDALONE_TOOLCHAIN}"; then
-		fuse-overlayfs \
-			"${TERMUX_STANDALONE_TOOLCHAIN}" \
-			-o lowerdir="${NDK}/toolchains/llvm/prebuilt/linux-x86_64" \
-			-o upperdir="${TERMUX_STANDALONE_TOOLCHAIN}-upper" \
-			-o workdir="${TERMUX_STANDALONE_TOOLCHAIN}-work"
+		# Try to use fuse-overlayfs for efficient space usage (requires FUSE device)
+		# If it fails (e.g., in CI containers without FUSE support), fall back to copying
+		if command -v fuse-overlayfs >/dev/null 2>&1 && \
+		   fuse-overlayfs \
+			   "${TERMUX_STANDALONE_TOOLCHAIN}" \
+			   -o lowerdir="${NDK}/toolchains/llvm/prebuilt/linux-x86_64" \
+			   -o upperdir="${TERMUX_STANDALONE_TOOLCHAIN}-upper" \
+			   -o workdir="${TERMUX_STANDALONE_TOOLCHAIN}-work" 2>/dev/null; then
+			: # fuse-overlayfs succeeded
+		else
+			echo "[!] fuse-overlayfs not available or FUSE device not accessible." >&2
+			echo "[*] Falling back to copying NDK toolchain (this will use more disk space)..." >&2
+			rm -rf "${TERMUX_STANDALONE_TOOLCHAIN}" "${TERMUX_STANDALONE_TOOLCHAIN}-upper" "${TERMUX_STANDALONE_TOOLCHAIN}-work"
+			cp -a "${NDK}/toolchains/llvm/prebuilt/linux-x86_64" "${TERMUX_STANDALONE_TOOLCHAIN}"
+		fi
 	fi
 
 	if [ -f "${TERMUX_STANDALONE_TOOLCHAIN}/.termux-standalone-toolchain" ]; then
