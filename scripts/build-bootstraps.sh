@@ -229,6 +229,108 @@ add_termux_bootstrap_second_stage_files() {
 
 }
 
+# Optimize bootstrap size by removing files not needed at runtime.
+# This significantly reduces the final bootstrap archive size.
+optimize_bootstrap_size() {
+
+	local package_arch="$1"
+	local prefix_dir="${BOOTSTRAP_ROOTFS}/${TERMUX_PREFIX}"
+
+	echo $'\n\n\n'"[*] Optimizing bootstrap size for '${package_arch}'..."
+
+	local before_size
+	before_size=$(du -sh "$prefix_dir" | cut -f1)
+
+	# Remove development files (headers, static libs, libtool archives,
+	# pkg-config, cmake modules) — not needed at runtime.
+	rm -rf "${prefix_dir}/include"
+	find "${prefix_dir}/lib" -name '*.a' -type f -delete 2>/dev/null || true
+	find "${prefix_dir}" -name '*.la' -type f -delete 2>/dev/null || true
+	rm -rf "${prefix_dir}/lib/pkgconfig"
+	rm -rf "${prefix_dir}/share/pkgconfig"
+	rm -rf "${prefix_dir}/lib/cmake"
+
+	# Remove man pages, info pages, and documentation.
+	rm -rf "${prefix_dir}/share/man"
+	rm -rf "${prefix_dir}/share/info"
+	rm -rf "${prefix_dir}/share/doc"
+	rm -rf "${prefix_dir}/share/gtk-doc"
+
+	# Remove shell completion files.
+	rm -rf "${prefix_dir}/share/bash-completion"
+	rm -rf "${prefix_dir}/share/zsh"
+
+	# Remove locale data (C/POSIX locale is built-in and always available).
+	rm -rf "${prefix_dir}/share/locale"
+
+	# Remove terminfo entries except common terminal types.
+	if [[ -d "${prefix_dir}/share/terminfo" ]]; then
+		local keep_terms=(
+			"a/ansi" "d/dumb" "l/linux"
+			"s/screen" "s/screen-256color"
+			"t/tmux" "t/tmux-256color"
+			"v/vt100" "v/vt102" "v/vt220"
+			"x/xterm" "x/xterm-256color" "x/xterm-color"
+		)
+		local terminfo_dir="${prefix_dir}/share/terminfo"
+		local terminfo_tmp
+		terminfo_tmp=$(mktemp -d)
+		for term in "${keep_terms[@]}"; do
+			if [[ -f "${terminfo_dir}/${term}" ]]; then
+				mkdir -p "${terminfo_tmp}/$(dirname "$term")"
+				cp "${terminfo_dir}/${term}" "${terminfo_tmp}/${term}"
+			fi
+		done
+		rm -rf "${terminfo_dir}"
+		mv "${terminfo_tmp}" "${terminfo_dir}"
+	fi
+
+	# Remove Python bytecode cache files.
+	find "${prefix_dir}" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
+	find "${prefix_dir}" -name '*.pyc' -type f -delete 2>/dev/null || true
+
+	# Remove dpkg md5sums (not required for package operation at runtime).
+	find "${prefix_dir}/var/lib/dpkg/info" -name '*.md5sums' -type f -delete 2>/dev/null || true
+
+	# Strip ELF binaries as a safety net for pre-built dependency debs
+	# that may not have been stripped during their own build.
+	# Find appropriate strip tool: llvm-strip -> arch-specific cross-strip -> host strip.
+	local strip_cmd=""
+	if command -v llvm-strip &>/dev/null; then
+		strip_cmd="llvm-strip"
+	else
+		case "$package_arch" in
+			aarch64) strip_cmd="aarch64-linux-gnu-strip" ;;
+			arm)     strip_cmd="arm-linux-gnueabihf-strip" ;;
+			i686)    strip_cmd="i686-linux-gnu-strip" ;;
+			x86_64)  strip_cmd="x86_64-linux-gnu-strip" ;;
+		esac
+		if [[ -n "$strip_cmd" ]] && ! command -v "$strip_cmd" &>/dev/null; then
+			if command -v strip &>/dev/null; then
+				strip_cmd="strip"
+			else
+				strip_cmd=""
+			fi
+		fi
+	fi
+	if [[ -n "$strip_cmd" ]]; then
+		echo "[*] Stripping binaries with ${strip_cmd}..."
+		find "${prefix_dir}" -type f \( -executable -o -name '*.so' -o -name '*.so.*' \) -print0 | \
+			xargs -r -0 file | grep -E "ELF .+ (executable|shared object)" | cut -f1 -d: | \
+			xargs -r "$strip_cmd" --strip-unneeded 2>/dev/null || true
+	else
+		echo "[!] No suitable strip tool found, skipping binary stripping."
+	fi
+
+	# Remove empty directories.
+	find "${prefix_dir}" -type d -empty -delete 2>/dev/null || true
+
+	local after_size
+	after_size=$(du -sh "$prefix_dir" | cut -f1)
+	echo "[*] Bootstrap size optimized: ${before_size} -> ${after_size}"
+
+}
+
 # Final stage: generate bootstrap archive and place it to current
 # working directory.
 # Information about symlinks is stored in file SYMLINKS.txt.
@@ -484,6 +586,9 @@ main() {
 
 		# Add termux bootstrap second stage files
 		add_termux_bootstrap_second_stage_files "$TERMUX_ARCH"
+
+		# Optimize bootstrap size by removing unnecessary files.
+		optimize_bootstrap_size "$TERMUX_ARCH"
 
 		# Create bootstrap archive.
 		create_bootstrap_archive "$TERMUX_ARCH" || return $?
