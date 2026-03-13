@@ -59,6 +59,25 @@ jobs:
           echo "architectures=$ARCH" >> $GITHUB_OUTPUT
           echo "Building for architectures: $ARCH"
 
+          # Split arm from other architectures since arm needs TERMUX_PACKAGE_VARIANT=apt-android-5
+          NON_ARM_ARCHS=""
+          HAS_ARM=false
+          for a in $(echo "$ARCH" | tr ',' ' '); do
+            if [ "$a" = "arm" ]; then
+              HAS_ARM=true
+            else
+              if [ -n "$NON_ARM_ARCHS" ]; then
+                NON_ARM_ARCHS="${NON_ARM_ARCHS},${a}"
+              else
+                NON_ARM_ARCHS="${a}"
+              fi
+            fi
+          done
+          echo "has_arm=$HAS_ARM" >> $GITHUB_OUTPUT
+          echo "non_arm_architectures=$NON_ARM_ARCHS" >> $GITHUB_OUTPUT
+          echo "Has arm: $HAS_ARM"
+          echo "Non-arm architectures: $NON_ARM_ARCHS"
+
       - name: Verify package name configuration
         run: |
           echo "=== Checking TERMUX_APP__PACKAGE_NAME ==="
@@ -92,17 +111,49 @@ jobs:
       - name: Pull Docker image
         run: docker pull ghcr.io/termux/package-builder
 
-      - name: Build bootstrap from source
+      - name: Build bootstrap from source (arm with apt-android-5)
+        if: ${{ steps.arch.outputs.has_arm == 'true' }}
+        run: |
+          echo "=== Building PRoot-Distro Bootstrap from SOURCE for arm ==="
+          echo "TERMUX_PACKAGE_VARIANT=apt-android-5"
+          echo ""
+
+          docker run --rm \
+            --init \
+            -v "$PWD:/home/builder/termux-packages" \
+            -v "$PWD/build-cache/.termux-build:/home/builder/.termux-build" \
+            -v "$PWD/build-cache/output:/home/builder/termux-packages/output" \
+            --env CI=true \
+            --env TERMUX_PACKAGE_VARIANT=apt-android-5 \
+            ghcr.io/termux/package-builder \
+            bash -c '
+              echo "=== Inside Docker container (arm, TERMUX_PACKAGE_VARIANT=$TERMUX_PACKAGE_VARIANT) ==="
+              echo "TERMUX_TOPDIR will be: $HOME/.termux-build"
+              ls -la $HOME/.termux-build/ 2>/dev/null | head -5 || echo "No existing build cache"
+
+              sudo apt-get update -q
+              sudo apt-get install -yq llvm file
+              echo "llvm-strip location: $(which llvm-strip 2>/dev/null || echo NOT FOUND)"
+              echo "file location: $(which file 2>/dev/null || echo NOT FOUND)"
+
+              cd /home/builder/termux-packages
+
+              ./scripts/build-kimiclaw-proot-distro-bootstrap.sh \
+                --architectures arm
+            ' 2>&1 | tee -a build.log
+
+          echo ""
+          echo "=== Generated files (arm) ==="
+          ls -lh bootstrap-arm.zip 2>/dev/null || echo "No bootstrap-arm.zip found in root"
+
+      - name: Build bootstrap from source (non-arm architectures)
+        if: ${{ steps.arch.outputs.non_arm_architectures != '' }}
         run: |
           echo "=== Building PRoot-Distro Bootstrap from SOURCE (not pre-built packages) ==="
           echo "This compiles all packages from scratch so com.moonshot.kimiclaw prefix takes effect"
-          echo "Timeout: 8 hours"
+          echo "Architectures: ${{ steps.arch.outputs.non_arm_architectures }}"
           echo ""
 
-          # Run Docker with explicit cache volume mounts
-          # - Mount repo into container
-          # - Mount build cache so compiled packages survive between CI runs
-          # - Mount output cache for built debs
           docker run --rm \
             --init \
             -v "$PWD:/home/builder/termux-packages" \
@@ -115,8 +166,6 @@ jobs:
               echo "TERMUX_TOPDIR will be: $HOME/.termux-build"
               ls -la $HOME/.termux-build/ 2>/dev/null | head -5 || echo "No existing build cache"
 
-              # Install llvm-strip and file inside the container for slim_bootstrap
-              # The container runs as builder user, use sudo for apt
               sudo apt-get update -q
               sudo apt-get install -yq llvm file
               echo "llvm-strip location: $(which llvm-strip 2>/dev/null || echo NOT FOUND)"
@@ -125,8 +174,8 @@ jobs:
               cd /home/builder/termux-packages
 
               ./scripts/build-kimiclaw-proot-distro-bootstrap.sh \
-                --architectures '"${{ steps.arch.outputs.architectures }}"'
-            ' 2>&1 | tee build.log
+                --architectures '"${{ steps.arch.outputs.non_arm_architectures }}"'
+            ' 2>&1 | tee -a build.log
 
           echo ""
           echo "=== Generated files ==="
