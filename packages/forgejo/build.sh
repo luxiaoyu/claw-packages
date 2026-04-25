@@ -2,9 +2,10 @@ TERMUX_PKG_HOMEPAGE=https://forgejo.org/
 TERMUX_PKG_DESCRIPTION="Forgejo is a self-hosted lightweight software forge."
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@termux"
-TERMUX_PKG_VERSION="14.0.2"
+TERMUX_PKG_VERSION="15.0.0"
+TERMUX_PKG_REVISION=1
 TERMUX_PKG_SRCURL="https://codeberg.org/forgejo/forgejo/archive/v$TERMUX_PKG_VERSION.tar.gz"
-TERMUX_PKG_SHA256=b45d8ad1378a66dcee8e9672f55467aaa2e95b228a58c52be72750edb2888381
+TERMUX_PKG_SHA256=9a7a66e9aefab71bfbb4e02aa6774094e6a5069aeb7aa7b3c5233586184fa053
 TERMUX_PKG_AUTO_UPDATE=true
 TERMUX_PKG_DEPENDS="dash, git"
 TERMUX_PKG_CONFFILES="etc/forgejo/app.ini"
@@ -23,13 +24,6 @@ termux_step_make() {
 
 	go mod init || :
 	go mod tidy
-
-	# Effectively a backport of https://github.com/lib/pq/commit/6a102c04ac8dc082f1684b0488275575c374cb4c.
-	for f in "$GOPATH"/pkg/mod/github.com/lib/pq@*/user_posix.go; do
-		chmod 0755 "$(dirname "$f")"
-		chmod 0644 "$f"
-		sed -i '/^\/\/ +build /s/ linux / linux,!android /g' "$f"
-	done
 
 	LDFLAGS=""
 	LDFLAGS+=" -X forgejo.org/forgejo/modules/setting.CustomConf=$TERMUX_PREFIX/etc/forgejo/app.ini"

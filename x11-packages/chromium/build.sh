@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://www.chromium.org/Home
 TERMUX_PKG_DESCRIPTION="Chromium web browser"
 TERMUX_PKG_LICENSE="BSD 3-Clause"
 TERMUX_PKG_MAINTAINER="@licy183"
-TERMUX_PKG_VERSION="145.0.7632.159"
+TERMUX_PKG_VERSION="146.0.7680.177"
 TERMUX_PKG_SRCURL=https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$TERMUX_PKG_VERSION-lite.tar.xz
-TERMUX_PKG_SHA256=12e53b149f7621ee0741d25005a8d7e79cf95ce13efc4063fda04b4db6c882f1
+TERMUX_PKG_SHA256=e66465f7b26c91dfa06b31aba3c56f6e65edac6b227c6bd2edc04535ef8966cb
 TERMUX_PKG_DEPENDS="atk, cups, dbus, fontconfig, gtk3, krb5, libc++, libevdev, libxkbcommon, libminizip, libnss, libx11, mesa, openssl, pango, pulseaudio, zlib"
 TERMUX_PKG_BUILD_DEPENDS="chromium-host-tools, libffi-static"
 # TODO: Split chromium-common and chromium-headless
@@ -62,6 +62,13 @@ termux_step_post_get_source() {
 	if [ "${version_tools}" != "${TERMUX_PKG_VERSION}" ]; then
 		termux_error_exit "Version mismatch between chromium-host-tools and chromium."
 	fi
+
+	# Apply patches related to c++23
+	local f
+	for f in $(find "$TERMUX_PKG_BUILDER_DIR/../chromium-host-tools/cxx-patches" -maxdepth 1 -type f -name *.patch | sort); do
+		echo "Applying patch: $(basename $f)"
+		patch -p1 --silent < "$f"
+	done
 
 	# Apply patches related to chromium
 	local f
@@ -471,9 +478,11 @@ termux_step_make_install() {
 	install -Dm644 $TERMUX_PKG_SRCDIR/chrome/installer/linux/common/desktop.template \
 		"$TERMUX_PREFIX/share/applications/chromium.desktop"
 	sed -i \
-		-e 's/@@MENUNAME@@/Chromium/g' \
-		-e 's/@@PACKAGE@@/chromium/g' \
-		-e 's/@@USR_BIN_SYMLINK_NAME@@/chromium-browser/g' \
+		-e 's/@@MENUNAME/Chromium/g' \
+		-e 's/@@PACKAGE/chromium/g' \
+		-e 's/@@usr_bin_symlink_name/chromium-browser/g' \
+		-e 's|@@uri_scheme|x-scheme-handler/chromium;|g' \
+		-e 's/@@extra_desktop_entries//g' \
 		-e "s|Exec=/usr/bin|Exec=$TERMUX_PREFIX/bin|g" \
 		"$TERMUX_PREFIX/share/applications/chromium.desktop" \
 		"$TERMUX_PREFIX/share/man/man1/chromium.1"

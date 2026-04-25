@@ -2,9 +2,9 @@ TERMUX_PKG_HOMEPAGE=https://deno.land/
 TERMUX_PKG_DESCRIPTION="A modern runtime for JavaScript and TypeScript"
 TERMUX_PKG_LICENSE="MIT"
 TERMUX_PKG_MAINTAINER="@licy183"
-TERMUX_PKG_VERSION="1:2.7.4"
+TERMUX_PKG_VERSION="1:2.7.13"
 TERMUX_PKG_SRCURL=https://github.com/denoland/deno/releases/download/v${TERMUX_PKG_VERSION:2}/deno_src.tar.gz
-TERMUX_PKG_SHA256=80ccc7ca0e0b9577d49c1f2d2ad0fcb540e2982adff8d8f18556bc48c115494a
+TERMUX_PKG_SHA256=c0264948150019220e70d2da428ca34daf2a86e7ba4f0753fd699575bf6f2477
 TERMUX_PKG_DEPENDS="libandroid-stub, libffi, libsqlite, zlib"
 TERMUX_PKG_BUILD_DEPENDS="aosp-libs"
 TERMUX_PKG_BUILD_IN_SRC=true
@@ -129,6 +129,7 @@ use_jumbo_build=true
 	export "$env_name"="$BINDGEN_EXTRA_CLANG_ARGS"
 
 	export V8_FROM_SOURCE=1
+	export CARGO_FEATURE_SIMDUTF=1
 	# TODO: How to track the output of v8's build.rs without passing `-vv`
 	cargo build --jobs "${TERMUX_PKG_MAKE_PROCESSES}" --target "${CARGO_TARGET_NAME}" --release
 
