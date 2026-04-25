@@ -21,7 +21,8 @@ KIMICLAW_PACKAGES=(
     "openssh"          # SSH client and server
     "proot"            # proot for /tmp support via termux-chroot
     "proot-distro"     # proot-distro for managing multiple distros
-    "nodejs"           # fast-path: Termux 原生 bionic node 25.x（自动带 c-ares）
+    "nodejs-lts"       # fast-path: Termux 原生 bionic node 24
+    "c-ares"           # fast-path: libcares.so（node 24 运行时依赖）
 )
 
 # Convert array to comma-separated list
